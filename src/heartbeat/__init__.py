@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from heartbeat!")
+"""ECG heartbeat classification on the MIT-BIH arrhythmia dataset."""

@@ -1,7 +1,7 @@
 [project]
 name = "heartbeat"
 version = "0.1.0"
-description = "Add your description here"
+description = "Neural network training and evaluation pipeline for ECG heartbeat classification"
 authors = [
     { name = "theofriberg", email = "friberg.theodor77@live.se" }
 ]
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-heartbeat = "heartbeat:main"
+heartbeat = "heartbeat.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.9,<0.14.0"]

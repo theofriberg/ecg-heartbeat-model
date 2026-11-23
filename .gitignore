@@ -11,3 +11,6 @@ wheels/
 
 # MacOS
 .DS_Store
+
+# Training outputs (checkpoints, metrics, plots)
+runs/
