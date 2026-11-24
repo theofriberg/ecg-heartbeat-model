@@ -35,11 +35,6 @@ uv sync
 
 The dataset is public, so **no Kaggle account is needed**. `kagglehub` downloads it on first use and caches it in `~/.cache/kagglehub/`.
 
-You only need credentials for private data or competitions. To set them up, create a token at kaggle.com under **Settings → API → Create New Token**, then do one of the following:
-
-- save the token to `~/.kaggle/access_token` and run `chmod 600 ~/.kaggle/access_token`, or
-- export it as an environment variable: `export KAGGLE_API_TOKEN=...`
-
 ## Usage
 
 ```bash
@@ -139,4 +134,4 @@ The "overfit a single batch" test is a standard debugging check. If the model ca
 
 ## Known issues
 
-- **PyTorch is pinned to `<2.15`.** PyTorch 2.15's Apple GPU (MPS) code needs macOS 15 or later and crashes on macOS 14. Version 2.14 works on MPS. Remove the pin in `pyproject.toml` once you're on macOS 15 or later.
+- **PyTorch is pinned to `<2.15`.** PyTorch 2.15's Apple GPU (MPS) code needs macOS 15 or later and crashes on macOS 14. Version 2.14 works on MPS.
