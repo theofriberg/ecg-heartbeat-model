@@ -68,9 +68,13 @@ def load_splits(cfg: Config) -> Splits:
     x_test, y_test = load_csv(root / "mitbih_test.csv")
 
     # Stratify so the rare classes (F has ~640 examples) appear in validation
-    # in the same proportion as in training.
-    x_train, x_val, y_train, y_val = train_test_split(
-        x, y, test_size=cfg.val_fraction, stratify=y, random_state=cfg.seed
+    # in the same proportion as in training. sklearn's return type is loosely
+    # annotated (list | array), so np.asarray narrows it; it doesn't copy.
+    x_train, x_val, y_train, y_val = (
+        np.asarray(a)
+        for a in train_test_split(
+            x, y, test_size=cfg.val_fraction, stratify=y, random_state=cfg.seed
+        )
     )
     log.info("train=%d  val=%d  test=%d", len(y_train), len(y_val), len(y_test))
     log.info("train class counts: %s", np.bincount(y_train, minlength=NUM_CLASSES).tolist())

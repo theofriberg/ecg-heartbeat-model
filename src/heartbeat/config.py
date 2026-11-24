@@ -44,6 +44,8 @@ class Config:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Config":
-        known = {f.name: f for f in fields(cls)}
-        kwargs = {k: (Path(v) if k == "output_dir" else v) for k, v in d.items() if k in known}
+        known = {f.name for f in fields(cls)}
+        kwargs: dict[str, Any] = {k: v for k, v in d.items() if k in known}
+        if "output_dir" in kwargs:
+            kwargs["output_dir"] = Path(kwargs["output_dir"])
         return cls(**kwargs)

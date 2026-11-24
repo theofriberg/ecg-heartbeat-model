@@ -53,9 +53,14 @@ def predict(
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     """Accuracy is misleading here (~83% of beats are 'N'), so we track macro
-    metrics that weigh every class equally."""
+    metrics that weigh every class equally.
+
+    sklearn returns NumPy scalars (and f1_score is typed as possibly returning
+    an array, for average=None), so convert to plain Python floats: this keeps
+    the declared return type honest and makes the values JSON-serialisable.
+    """
     return {
-        "accuracy": accuracy_score(y_true, y_pred),
-        "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
-        "macro_f1": f1_score(y_true, y_pred, average="macro"),
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+        "macro_f1": float(f1_score(y_true, y_pred, average="macro")),
     }

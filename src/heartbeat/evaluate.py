@@ -39,6 +39,7 @@ def evaluate_checkpoint(checkpoint: Path, split: str = "test") -> dict:
 
     metrics = compute_metrics(y_true, y_pred)
     report = classification_report(y_true, y_pred, target_names=CLASS_NAMES, digits=4)
+    assert isinstance(report, str)  # it's a dict only with output_dict=True
     log.info("%s results (checkpoint from epoch %d):\n%s", split, ckpt["epoch"], report)
 
     out_dir = checkpoint.parent
