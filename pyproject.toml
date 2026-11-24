@@ -2,6 +2,7 @@
 name = "heartbeat"
 version = "0.1.0"
 description = "Neural network training and evaluation pipeline for ECG heartbeat classification"
+readme = "README.md"
 authors = [
     { name = "theofriberg", email = "friberg.theodor77@live.se" }
 ]
