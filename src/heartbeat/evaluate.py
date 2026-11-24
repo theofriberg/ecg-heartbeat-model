@@ -22,8 +22,8 @@ from heartbeat.utils import get_device
 log = logging.getLogger(__name__)
 
 
-def evaluate_checkpoint(checkpoint: Path, split: str = "test") -> dict:
-    device = get_device()
+def evaluate_checkpoint(checkpoint: Path, split: str = "test", device_name: str = "auto") -> dict:
+    device = get_device(device_name)
     # weights_only=True refuses to unpickle arbitrary objects: safe loading.
     ckpt = torch.load(checkpoint, map_location="cpu", weights_only=True)
     cfg = Config.from_dict(ckpt["config"])

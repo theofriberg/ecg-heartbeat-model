@@ -14,8 +14,11 @@ def seed_everything(seed: int) -> None:
     torch.manual_seed(seed)  # also seeds CUDA and MPS
 
 
-def get_device() -> torch.device:
-    """Prefer CUDA (NVIDIA), then MPS (Apple Silicon GPU), then CPU."""
+def get_device(preference: str = "auto") -> torch.device:
+    """Use the requested device, or with "auto" prefer CUDA (NVIDIA), then
+    MPS (Apple Silicon GPU), then CPU."""
+    if preference != "auto":
+        return torch.device(preference)
     if torch.cuda.is_available():
         return torch.device("cuda")
     if torch.backends.mps.is_available():

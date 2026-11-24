@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> None:
     p_eval = sub.add_parser("evaluate", help="evaluate a checkpoint")
     p_eval.add_argument("checkpoint", type=Path, help="path to best.pt")
     p_eval.add_argument("--split", choices=["val", "test"], default="test")
+    p_eval.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
 
     args = parser.parse_args(argv)
     setup_logging()
@@ -54,4 +55,4 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "evaluate":
         from heartbeat.evaluate import evaluate_checkpoint
 
-        evaluate_checkpoint(args.checkpoint, args.split)
+        evaluate_checkpoint(args.checkpoint, args.split, args.device)

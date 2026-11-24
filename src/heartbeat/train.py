@@ -39,7 +39,7 @@ def param_groups(model: nn.Module, weight_decay: float) -> list[dict]:
 
 def train(cfg: Config) -> Path:
     seed_everything(cfg.seed)
-    device = get_device()
+    device = get_device(cfg.device)
 
     run_dir = cfg.output_dir / datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir.mkdir(parents=True, exist_ok=False)

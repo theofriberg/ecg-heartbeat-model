@@ -35,6 +35,7 @@ class Config:
 
     # --- misc ---
     seed: int = 42
+    device: str = "auto"  # auto | cpu | mps | cuda
     num_workers: int = 0  # data is in memory; extra workers only add overhead here
     output_dir: Path = Path("runs")
 
