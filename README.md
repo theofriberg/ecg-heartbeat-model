@@ -47,7 +47,16 @@ uv run heartbeat evaluate runs/<timestamp>/best.pt --split val    # while you're
 uv run heartbeat evaluate runs/<timestamp>/best.pt --split test   # once, at the very end
 ```
 
-Training uses an NVIDIA GPU (CUDA) or Apple Silicon GPU (MPS) if one is available, and falls back to the CPU otherwise.
+### Choosing a device
+
+By default (`--device auto`), training uses an NVIDIA GPU (CUDA) or Apple Silicon GPU (MPS) if one is available, and falls back to the CPU otherwise. To force a specific device, pass `--device` to `train` or `evaluate`:
+
+```bash
+uv run heartbeat train --device cpu                               # cpu | mps | cuda | auto
+uv run heartbeat evaluate runs/<timestamp>/best.pt --split val --device cpu
+```
+
+This is useful when debugging. If a run looks wrong on the GPU, train the same configuration on the CPU with the same `--seed` and compare the two. The numbers won't match exactly, because CPU and GPU round floating-point arithmetic differently, but the curves should look alike.
 
 ### Outputs
 
