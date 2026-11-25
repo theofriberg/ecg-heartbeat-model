@@ -51,7 +51,12 @@ def main(argv: list[str] | None = None) -> None:
         from heartbeat.train import train
 
         cfg_kwargs = {f.name: getattr(args, f.name) for f in fields(Config)}
-        train(Config(**cfg_kwargs))
+        cfg = Config(**cfg_kwargs)
+        try:
+            cfg.validate()
+        except ValueError as e:
+            p_train.error(str(e))  # prints usage + message, exits with code 2
+        train(cfg)
     elif args.command == "evaluate":
         from heartbeat.evaluate import evaluate_checkpoint
 

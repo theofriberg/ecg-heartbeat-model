@@ -28,8 +28,8 @@ class Config:
     batch_size: int = 256
     lr: float = 3e-3  # peak LR of the one-cycle schedule
     weight_decay: float = 1e-2
-    label_smoothing: float = 0.05
-    class_weighting: bool = True  # counteract the heavy class imbalance
+    label_smoothing: float = 0.05  # must be 0 when class_weighting is on, see validate()
+    class_weighting: bool = False  # balanced class weights in the loss
     grad_clip: float = 1.0  # 0 disables
     patience: int = 7  # early stopping on validation macro-F1
 
@@ -38,6 +38,21 @@ class Config:
     device: str = "auto"  # auto | cpu | mps | cuda
     num_workers: int = 0  # data is in memory; extra workers only add overhead here
     output_dir: Path = Path("runs")
+
+    def validate(self) -> None:
+        """Reject setting combinations that train without errors but give a broken model.
+
+        Called by train() rather than __post_init__, so checkpoints saved with
+        an older, invalid config can still be loaded and evaluated.
+        """
+        if self.class_weighting and self.label_smoothing > 0:
+            raise ValueError(
+                "class_weighting and label_smoothing cannot both be enabled. "
+                "PyTorch's CrossEntropyLoss multiplies the smoothing term by the "
+                "class weights too, which pushes every sample towards the rarest "
+                "classes (normal beats get predicted as F/S). Use "
+                "--no-class-weighting or --label-smoothing 0."
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """JSON/torch-safe dict (Paths become strings)."""

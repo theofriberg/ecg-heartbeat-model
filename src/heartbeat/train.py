@@ -38,6 +38,7 @@ def param_groups(model: nn.Module, weight_decay: float) -> list[dict]:
 
 
 def train(cfg: Config) -> Path:
+    cfg.validate()  # fail fast, before creating a run dir or loading data
     seed_everything(cfg.seed)
     device = get_device(cfg.device)
 

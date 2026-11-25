@@ -1,9 +1,11 @@
 """Fast sanity tests that need no dataset download (synthetic data only)."""
 
 import numpy as np
+import pytest
 import torch
 from torch import nn
 
+from heartbeat.config import Config
 from heartbeat.data import NUM_CLASSES, SIGNAL_LENGTH, ECGDataset
 from heartbeat.model import ECGResNet
 
@@ -14,6 +16,14 @@ def synthetic(n: int = 64, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
     x[:, 150:] = 0.0  # mimic zero padding
     y = rng.integers(0, NUM_CLASSES, n)
     return x, y
+
+
+def test_config_rejects_class_weighting_with_label_smoothing():
+    with pytest.raises(ValueError, match="cannot both be enabled"):
+        Config(class_weighting=True, label_smoothing=0.05).validate()
+    # Either one on its own is fine.
+    Config(class_weighting=True, label_smoothing=0.0).validate()
+    Config(class_weighting=False, label_smoothing=0.05).validate()
 
 
 def test_model_output_shape():
