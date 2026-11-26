@@ -3,8 +3,10 @@
 import numpy as np
 import pytest
 import torch
+from sklearn.metrics import f1_score
 from torch import nn
 
+from heartbeat.compare import confusion, macro_f1_from_confusion, paired_bootstrap
 from heartbeat.config import Config
 from heartbeat.data import NUM_CLASSES, SIGNAL_LENGTH, ECGDataset
 from heartbeat.model import ECGResNet
@@ -24,6 +26,32 @@ def test_config_rejects_class_weighting_with_label_smoothing():
     # Either one on its own is fine.
     Config(class_weighting=True, label_smoothing=0.0).validate()
     Config(class_weighting=False, label_smoothing=0.05).validate()
+
+
+def test_macro_f1_from_confusion_matches_sklearn():
+    rng = np.random.default_rng(0)
+    y_true = rng.integers(0, NUM_CLASSES, 500)
+    y_pred = np.where(rng.random(500) < 0.7, y_true, rng.integers(0, NUM_CLASSES, 500))
+    y_pred[y_pred == 3] = 0  # a class that is never predicted -> its F1 is 0
+    ours = macro_f1_from_confusion(confusion(y_true, y_pred, NUM_CLASSES))
+    ref = f1_score(y_true, y_pred, average="macro", labels=range(NUM_CLASSES))
+    assert ours == pytest.approx(ref)
+
+
+def test_paired_bootstrap():
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, NUM_CLASSES, 1000)
+    noisy = np.where(rng.random(1000) < 0.6, y, rng.integers(0, NUM_CLASSES, 1000))
+
+    # A model compared with itself: every resample gives exactly 0 difference.
+    same = paired_bootstrap(y, noisy, noisy.copy(), n_boot=200)
+    assert same.n_disagree == 0
+    assert np.all(same.diffs == 0)
+
+    # A perfect model vs a 60%-accurate one: the whole interval is above 0.
+    r = paired_bootstrap(y, y.copy(), noisy, n_boot=200)
+    assert r.score_a == pytest.approx(1.0)
+    assert r.interval(r.diffs)[0] > 0
 
 
 def test_model_output_shape():

@@ -1,4 +1,4 @@
-"""Command-line entry point: `uv run heartbeat {download,train,evaluate}`.
+"""Command-line entry point: `uv run heartbeat {download,train,evaluate,compare}`.
 
 Training flags are generated from the Config dataclass, so adding a field
 there automatically adds a `--flag` here.
@@ -39,6 +39,16 @@ def main(argv: list[str] | None = None) -> None:
     p_eval.add_argument("--split", choices=["val", "test"], default="test")
     p_eval.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
 
+    p_cmp = sub.add_parser(
+        "compare", help="compare two checkpoints with a paired bootstrap of macro-F1"
+    )
+    p_cmp.add_argument("checkpoint_a", type=Path, help="path to the first best.pt")
+    p_cmp.add_argument("checkpoint_b", type=Path, help="path to the second best.pt")
+    p_cmp.add_argument("--split", choices=["val", "test"], default="val")
+    p_cmp.add_argument("--n-boot", type=int, default=2000, help="bootstrap resamples")
+    p_cmp.add_argument("--seed", type=int, default=0, help="seed for the resampling")
+    p_cmp.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
+
     args = parser.parse_args(argv)
     setup_logging()
 
@@ -61,3 +71,17 @@ def main(argv: list[str] | None = None) -> None:
         from heartbeat.evaluate import evaluate_checkpoint
 
         evaluate_checkpoint(args.checkpoint, args.split, args.device)
+    elif args.command == "compare":
+        from heartbeat.compare import compare_checkpoints
+
+        try:
+            compare_checkpoints(
+                args.checkpoint_a,
+                args.checkpoint_b,
+                args.split,
+                args.n_boot,
+                args.seed,
+                args.device,
+            )
+        except ValueError as e:
+            p_cmp.error(str(e))

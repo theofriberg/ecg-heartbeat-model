@@ -22,7 +22,10 @@ from heartbeat.utils import get_device
 log = logging.getLogger(__name__)
 
 
-def evaluate_checkpoint(checkpoint: Path, split: str = "test", device_name: str = "auto") -> dict:
+def predict_checkpoint(
+    checkpoint: Path, split: str = "test", device_name: str = "auto"
+) -> tuple[np.ndarray, np.ndarray, Config, dict]:
+    """Load a checkpoint and predict on a split. Returns (y_true, y_pred, cfg, ckpt)."""
     device = get_device(device_name)
     # weights_only=True refuses to unpickle arbitrary objects: safe loading.
     ckpt = torch.load(checkpoint, map_location="cpu", weights_only=True)
@@ -35,7 +38,11 @@ def evaluate_checkpoint(checkpoint: Path, split: str = "test", device_name: str 
     splits = load_splits(cfg)  # same seed -> identical train/val split as training
     x, y = (splits.x_test, splits.y_test) if split == "test" else (splits.x_val, splits.y_val)
     logits, targets = predict(model, make_eval_loader(cfg, ECGDataset(x, y)), device)
-    y_true, y_pred = targets.numpy(), logits.argmax(1).numpy()
+    return targets.numpy(), logits.argmax(1).numpy(), cfg, ckpt
+
+
+def evaluate_checkpoint(checkpoint: Path, split: str = "test", device_name: str = "auto") -> dict:
+    y_true, y_pred, _, ckpt = predict_checkpoint(checkpoint, split, device_name)
 
     metrics = compute_metrics(y_true, y_pred)
     report = classification_report(y_true, y_pred, target_names=CLASS_NAMES, digits=4)

@@ -45,6 +45,8 @@ uv run heartbeat train --help                     # list all settings
 
 uv run heartbeat evaluate runs/<timestamp>/best.pt --split val    # while you're developing
 uv run heartbeat evaluate runs/<timestamp>/best.pt --split test   # once, at the very end
+
+uv run heartbeat compare runs/<run A>/best.pt runs/<run B>/best.pt  # is A really better than B?
 ```
 
 ### Choosing a device
@@ -77,6 +79,22 @@ runs/<timestamp>/
 The official training file is split 90/10 into **train** and **validation** sets. The split is *stratified*, so every class appears in both sets in the same proportion.
 
 The validation set is used to pick the best checkpoint and to tune settings. The official **test** set is never used during training. Only run `evaluate --split test` once you've stopped making decisions. If you tune settings against the test score, it no longer tells you how the model performs on new data.
+
+### Comparing two runs
+
+A single macro-F1 score is partly luck: it depends on which beats happen to be in the validation set. The F class has only about 64 validation beats, and finding one more of them raises macro-F1 by about 0.002.
+
+`heartbeat compare` uses a **paired bootstrap** to check whether a difference between two checkpoints is larger than that noise. It draws thousands of resamples of the validation set (as many beats as the original, drawn with replacement), scores both models on each resample, and reports the 95% interval of the difference:
+
+```
+  A - B: +0.0015   95% interval [-0.0102, +0.0134]   sd 0.0060
+  A better in 59% of resamples
+```
+
+If the interval includes 0, the split can't tell the two models apart. On this validation set, a single comparison needs a difference of roughly 0.012 to be convincing.
+
+- The two runs must share a validation split, so they need the same `--seed`. The command refuses otherwise.
+- The bootstrap only covers noise from the choice of validation beats, not training noise (initialisation, batch order). To confirm a small improvement, also compare over several seeds and check that the difference has the same sign in each.
 
 ## Model
 
@@ -123,6 +141,7 @@ src/heartbeat/
 ├── engine.py     inner loops (train one epoch, predict) and metrics
 ├── train.py      wires everything together: optimiser, schedule, checkpoints, early stopping
 ├── evaluate.py   evaluates a checkpoint, writes report and confusion matrix
+├── compare.py    paired bootstrap comparison of two checkpoints
 ├── cli.py        `heartbeat` command; training flags are generated from Config
 └── utils.py      seeding, device selection, logging
 tests/
