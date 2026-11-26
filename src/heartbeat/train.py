@@ -12,7 +12,7 @@ from torch import nn
 
 from heartbeat.config import Config
 from heartbeat.data import NUM_CLASSES, class_weights, load_splits, make_loaders
-from heartbeat.engine import compute_metrics, predict, train_one_epoch
+from heartbeat.engine import compute_metrics, make_ema, predict, train_one_epoch
 from heartbeat.model import ECGResNet, count_parameters
 from heartbeat.utils import get_device, seed_everything
 
@@ -53,6 +53,12 @@ def train(cfg: Config) -> Path:
     model = build_model(cfg).to(device)
     log.info("Model has %s trainable parameters", f"{count_parameters(model):,}")
 
+    # The EMA copy is what we validate, select and checkpoint.
+    ema = make_ema(model, cfg.ema_decay) if cfg.ema_decay > 0 else None
+    # ema.module is a plain ECGResNet, so its state_dict loads like any other
+    # checkpoint (no "module." prefix or n_averaged counter).
+    eval_model = ema.module if ema is not None else model
+
     weight = class_weights(splits.y_train).to(device) if cfg.class_weighting else None
     criterion = nn.CrossEntropyLoss(weight=weight, label_smoothing=cfg.label_smoothing)
     optimizer = torch.optim.AdamW(param_groups(model, cfg.weight_decay), lr=cfg.lr)
@@ -65,9 +71,9 @@ def train(cfg: Config) -> Path:
     for epoch in range(1, cfg.epochs + 1):
         t0 = time.perf_counter()
         train_loss = train_one_epoch(
-            model, train_loader, criterion, optimizer, scheduler, device, cfg.grad_clip
+            model, train_loader, criterion, optimizer, scheduler, device, cfg.grad_clip, ema
         )
-        logits, targets = predict(model, val_loader, device)
+        logits, targets = predict(eval_model, val_loader, device)
         val_loss = criterion(logits.to(device), targets.to(device)).item()
         metrics = compute_metrics(targets.numpy(), logits.argmax(1).numpy())
 
@@ -78,13 +84,21 @@ def train(cfg: Config) -> Path:
             "val_loss": val_loss,
             **{f"val_{k}": v for k, v in metrics.items()},
         }
+        raw_f1_msg = ""
+        if ema is not None:
+            # Also score the live weights, so history.csv shows what the EMA buys.
+            raw_logits, _ = predict(model, val_loader, device)
+            raw_f1 = compute_metrics(targets.numpy(), raw_logits.argmax(1).numpy())["macro_f1"]
+            row["raw_val_macro_f1"] = raw_f1
+            raw_f1_msg = f" (raw {raw_f1:.4f})"
         history.append(row)
         log.info(
-            "epoch %3d | train_loss %.4f | val_loss %.4f | val_f1 %.4f | val_acc %.4f | %.1fs",
+            "epoch %3d | train_loss %.4f | val_loss %.4f | val_f1 %.4f%s | val_acc %.4f | %.1fs",
             epoch,
             train_loss,
             val_loss,
             metrics["macro_f1"],
+            raw_f1_msg,
             metrics["accuracy"],
             time.perf_counter() - t0,
         )
@@ -94,7 +108,7 @@ def train(cfg: Config) -> Path:
             best_f1, epochs_without_improvement = metrics["macro_f1"], 0
             torch.save(
                 {
-                    "model_state": model.state_dict(),
+                    "model_state": eval_model.state_dict(),
                     "config": cfg.to_dict(),
                     "epoch": epoch,
                     "val_macro_f1": best_f1,

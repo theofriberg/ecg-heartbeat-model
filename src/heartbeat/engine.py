@@ -3,11 +3,49 @@
 Kept free of I/O and config so they're easy to test and reuse.
 """
 
+from collections.abc import Sequence
+
 import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from torch import nn
+from torch.optim.swa_utils import AveragedModel
 from torch.utils.data import DataLoader
+
+
+def make_ema(model: nn.Module, decay: float) -> AveragedModel:
+    """EMA copy of ``model`` whose decay warms up as min(decay, (1 + t) / (10 + t)).
+
+    Without warmup, a fixed decay of 0.999 keeps 0.999**t of the random initial
+    weights: still ~54% after 2 epochs (~600 steps), so early EMA models are
+    useless. With warmup the EMA starts by closely following the model, and its
+    window (~1 / (1 - decay_t) steps) grows to roughly the last ~10% of training,
+    capped at ~1 / (1 - decay) steps.
+
+    use_buffers=True averages BatchNorm's running mean/var too, so they match
+    the averaged weights.
+    """
+
+    @torch.no_grad()
+    def ema_update(
+        ema_params: Sequence[torch.Tensor],
+        model_params: Sequence[torch.Tensor],
+        num_averaged: torch.Tensor | int,
+    ) -> None:
+        # Called once per (device, dtype) group, so every tensor in a group shares a dtype.
+        # A per-tensor loop (instead of torch's private _foreach ops) costs ~60 small
+        # kernel launches per step for this model: negligible next to forward/backward.
+        if not torch.is_floating_point(ema_params[0]):
+            # Integer buffers (BatchNorm's num_batches_tracked) are counters, not weights.
+            for p_ema, p_model in zip(ema_params, model_params, strict=True):
+                p_ema.copy_(p_model)
+            return
+        t = int(num_averaged)
+        weight = 1 - min(decay, (1 + t) / (10 + t))
+        for p_ema, p_model in zip(ema_params, model_params, strict=True):
+            p_ema.lerp_(p_model, weight)
+
+    return AveragedModel(model, multi_avg_fn=ema_update, use_buffers=True)
 
 
 def train_one_epoch(
@@ -18,6 +56,7 @@ def train_one_epoch(
     scheduler: torch.optim.lr_scheduler.LRScheduler,
     device: torch.device,
     grad_clip: float = 0.0,
+    ema: AveragedModel | None = None,
 ) -> float:
     model.train()  # enables dropout + BatchNorm batch statistics
     total_loss, n = 0.0, 0
@@ -32,6 +71,8 @@ def train_one_epoch(
             nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
         scheduler.step()  # one-cycle schedules step per batch, not per epoch
+        if ema is not None:
+            ema.update_parameters(model)  # nudge the averaged copy towards the new weights
 
         total_loss += loss.item() * len(y)
         n += len(y)

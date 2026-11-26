@@ -32,6 +32,10 @@ class Config:
     class_weighting: bool = False  # balanced class weights in the loss
     grad_clip: float = 1.0  # 0 disables
     patience: int = 7  # early stopping on validation macro-F1
+    # EMA of the weights, used for validation and checkpoints. The decay warms up
+    # from ~0.1 and is capped here, so the EMA averages at most ~1 / (1 - decay)
+    # recent steps (0.999 -> ~1000 steps, ~3 epochs). See engine.make_ema. 0 disables.
+    ema_decay: float = 0.999
 
     # --- misc ---
     seed: int = 42
@@ -52,6 +56,11 @@ class Config:
                 "class weights too, which pushes every sample towards the rarest "
                 "classes (normal beats get predicted as F/S). Use "
                 "--no-class-weighting or --label-smoothing 0."
+            )
+        if not 0.0 <= self.ema_decay < 1.0:
+            raise ValueError(
+                f"ema_decay must be in [0, 1), got {self.ema_decay}. "
+                "1.0 would freeze the EMA at the initial random weights; use 0 to disable."
             )
 
     def to_dict(self) -> dict[str, Any]:

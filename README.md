@@ -126,6 +126,7 @@ You can change the size of the network with `--width` (channels in the first sta
 | **Label smoothing** (0.05) | Keeps the model from becoming overconfident |
 | **No class weights by default** (`--class-weighting` to enable) | Choosing the best checkpoint by macro-F1 already handles the imbalance. Balanced weights (up to 27× for F) cost a lot of precision on rare classes |
 | **Gradient clipping** | Prevents rare exploding updates |
+| **EMA of the weights** (decay 0.999, with warmup; `--ema-decay 0` to disable) | Validation, checkpoints and early stopping use an exponential moving average of recent weights, which is smoother and usually generalises slightly better. `history.csv` also logs `raw_val_macro_f1` for the live weights, for comparison |
 | **Augmentation**: amplitude scaling ±10% plus slight noise | More variety in the training data. Padding stays zero, and only the training set is augmented |
 | **Best checkpoint and early stopping chosen by validation macro-F1** | Accuracy is misleading on imbalanced data. Always predicting "N" scores 83% |
 | **Seeded random numbers**, config saved with each run | Reproducible results |

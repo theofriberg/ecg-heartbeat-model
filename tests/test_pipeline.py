@@ -9,6 +9,7 @@ from torch import nn
 from heartbeat.compare import confusion, macro_f1_from_confusion, paired_bootstrap
 from heartbeat.config import Config
 from heartbeat.data import NUM_CLASSES, SIGNAL_LENGTH, ECGDataset
+from heartbeat.engine import make_ema
 from heartbeat.model import ECGResNet
 
 
@@ -52,6 +53,38 @@ def test_paired_bootstrap():
     r = paired_bootstrap(y, y.copy(), noisy, n_boot=200)
     assert r.score_a == pytest.approx(1.0)
     assert r.interval(r.diffs)[0] > 0
+
+
+def test_config_rejects_bad_ema_decay():
+    for bad in (1.0, -0.1):
+        with pytest.raises(ValueError, match="ema_decay"):
+            Config(ema_decay=bad).validate()
+    Config(ema_decay=0.0).validate()  # 0 disables EMA
+
+
+def test_ema_trails_live_weights_and_loads_as_plain_model():
+    torch.manual_seed(0)
+    x, y = synthetic(32)
+    xb, yb = torch.from_numpy(x).unsqueeze(1), torch.from_numpy(y)
+    model = ECGResNet(num_classes=NUM_CLASSES)
+    ema = make_ema(model, decay=0.9)
+    ema.update_parameters(model)  # first call copies the weights
+    initial = [p.clone() for p in ema.module.parameters()]
+    opt = torch.optim.AdamW(model.parameters(), lr=1e-2)
+    for _ in range(5):
+        opt.zero_grad()
+        nn.functional.cross_entropy(model(xb), yb).backward()
+        opt.step()
+        ema.update_parameters(model)
+
+    live, averaged = model.state_dict(), ema.module.state_dict()
+    # It moved away from the initial weights, but not all the way to the live ones.
+    assert any(not torch.equal(a, b) for a, b in zip(initial, ema.module.parameters(), strict=True))
+    assert not torch.equal(live["stem.0.weight"], averaged["stem.0.weight"])
+    # BatchNorm running stats are averaged too, not just copied from the live model.
+    assert not torch.equal(live["stem.1.running_mean"], averaged["stem.1.running_mean"])
+    # Its state_dict loads into a plain ECGResNet, which is what evaluate.py relies on.
+    ECGResNet(num_classes=NUM_CLASSES).load_state_dict(averaged)
 
 
 def test_model_output_shape():
